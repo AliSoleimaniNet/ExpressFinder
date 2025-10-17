@@ -12,12 +12,12 @@ cd /d %~dp0
 :: If not running as admin, re-launch this script with admin rights
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo 🔷 Requesting administrator privileges...
+    echo Requesting administrator privileges...
     powershell -Command "Start-Process '%~f0' -Verb RunAs"
     exit /b
 )
 
-echo 🔷 Running Python script with administrator privileges...
+echo Running Python script with administrator privileges...
 %PYTHON% %SCRIPT%
 
 pause
