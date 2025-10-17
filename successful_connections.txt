@@ -1,0 +1,81 @@
+Location, Protocol, TimeToConnectSeconds
+Australia - Adelaide, LightwayUdp, 1.63
+Australia - Sydney, LightwayTcp, 24.03
+Australia - Sydney - 2, LightwayUdp, 16.74
+India (via UK), LightwayUdp, 1.68
+Japan - Shibuya, LightwayTcp, 2.06
+Japan - Tokyo, LightwayUdp, 3.06
+Malaysia, LightwayUdp, 2.03
+Malaysia, LightwayTcp, 3.79
+New Zealand, LightwayUdp, 2.02
+New Zealand, LightwayTcp, 1.73
+Singapore - Jurong, LightwayUdp, 16.31
+South Korea - 2, LightwayUdp, 17.28
+South Korea - 2, LightwayTcp, 1.9
+Taiwan - 3, LightwayUdp, 16.49
+Thailand, LightwayTcp, 1.8
+Argentina, LightwayUdp, 16.61
+Bahamas, LightwayUdp, 1.89
+Bahamas, LightwayTcp, 2.11
+Brazil - 2, LightwayUdp, 2.17
+Brazil - 2, LightwayTcp, 2.66
+Canada - Toronto, LightwayUdp, 2.6
+Canada - Toronto, LightwayTcp, 2.3
+Canada - Toronto - 2, LightwayUdp, 1.75
+Canada - Toronto - 2, LightwayTcp, 1.44
+Ecuador, LightwayUdp, 2.26
+Ecuador, LightwayTcp, 2.37
+Guatemala, LightwayUdp, 2.4
+Guatemala, LightwayTcp, 2.12
+Mexico, LightwayTcp, 1.71
+Panama, LightwayUdp, 16.59
+Peru, LightwayUdp, 2.26
+USA - Albuquerque, LightwayUdp, 2.72
+USA - Albuquerque, LightwayTcp, 2.51
+USA - Atlanta, LightwayUdp, 2.04
+USA - Atlanta, LightwayTcp, 2.67
+USA - Chicago, LightwayUdp, 5.19
+USA - Chicago, LightwayTcp, 2.57
+USA - Dallas, LightwayUdp, 4.93
+USA - Dallas, LightwayTcp, 2.41
+USA - Denver, LightwayUdp, 6.33
+USA - Detroit, LightwayUdp, 1.7
+USA - Detroit, LightwayTcp, 2.76
+USA - Houston, LightwayUdp, 1.89
+USA - Houston, LightwayTcp, 2.7
+USA - Los Angeles - 1, LightwayUdp, 2.1
+USA - Los Angeles - 1, LightwayTcp, 1.99
+USA - Los Angeles - 2, LightwayUdp, 2.09
+USA - Los Angeles - 2, LightwayTcp, 1.77
+USA - Los Angeles - 3, LightwayUdp, 2.15
+USA - Los Angeles - 3, LightwayTcp, 1.92
+USA - Miami, LightwayUdp, 1.91
+USA - Miami, LightwayTcp, 2.69
+USA - Miami - 2, LightwayUdp, 3.15
+USA - Miami - 2, LightwayTcp, 3.38
+USA - Minneapolis, LightwayUdp, 1.71
+USA - New Jersey - 1, LightwayUdp, 16.2
+USA - New Jersey - 1, LightwayTcp, 24.21
+USA - New Jersey - 2, LightwayUdp, 16.05
+USA - New Jersey - 2, LightwayTcp, 2.57
+USA - New Jersey - 3, LightwayUdp, 1.84
+USA - New Jersey - 3, LightwayTcp, 2.7
+USA - New York, LightwayUdp, 29.99
+USA - New York, LightwayTcp, 1.79
+USA - Phoenix, LightwayTcp, 3.21
+USA - Salt Lake City, LightwayUdp, 3.49
+USA - Salt Lake City, LightwayTcp, 1.72
+USA - San Francisco, LightwayUdp, 2.19
+USA - San Francisco, LightwayTcp, 24.46
+USA - Seattle, LightwayUdp, 17.48
+USA - Washington DC, LightwayUdp, 2.69
+USA - Washington DC, LightwayTcp, 2.56
+France - Marseille, LightwayUdp, 16.61
+Germany - Frankfurt - 3, LightwayUdp, 29.68
+Germany - Nuremberg, LightwayUdp, 1.97
+Ireland, LightwayUdp, 29.71
+Isle of Man, LightwayUdp, 1.47
+Isle of Man, LightwayTcp, 1.43
+Netherlands - The Hague, LightwayUdp, 15.69
+Poland, LightwayUdp, 1.65
+Turkey, LightwayUdp, 3.24
