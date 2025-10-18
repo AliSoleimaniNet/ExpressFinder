@@ -81,6 +81,3 @@ Connects to a location and stops on success.
 - **CLI Errors**: Verify ExpressVPN installation and CLI path. Ensure the service is running.
 - **No Locations**: Check ExpressVPN subscription and CLI output (`"C:\Program Files (x86)\ExpressVPN\services\ExpressVPN.CLI.exe" list`).
 - **Permission Issues**: Right-click batch files and select "Run as administrator".
-
-## License
-MIT License. See [LICENSE](LICENSE) file (if included).
