@@ -42,7 +42,6 @@ Run scripts via batch files to ensure administrator privileges.
 ### Before Running
 - **Check CLI Path**: Ensure `EXPRESSVPN_CLI` in scripts matches your ExpressVPN installation path.
 - **Configure Protocols**: In `connect.py`, `PROTOCOLS` is set to `LightwayUdp`. Add `LightwayTcp` to test both.
-- **Modify Location Filter**: Remove `if "Israel" in loc_name` in scripts to include all locations.
 
 ### Running Test Script (`test.py`)
 Tests all locations and logs results.
