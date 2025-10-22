@@ -26,7 +26,7 @@ Batch files (`test.bat` and `connect.bat`) ensure scripts run with administrator
 ## Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/gameraliaz/ExpressFinder.git
+   git clone https://github.com/AliSoleimaniNet/ExpressFinder.git
    ```
 2. Navigate to the directory:
    ```bash
