@@ -122,14 +122,19 @@ class VPNManager:
 
     # ── internal ──────────────────────────────────────────────────────────────
 
-    def _run(self, args: List[str], timeout: int = 10) -> str:
+    def _run(self, args: List[str], timeout: Optional[int] = 10) -> str:
+        """
+        Run CLI command.
+        timeout=None  → wait forever (no limit).
+        timeout=N     → raise after N seconds.
+        """
         cmd = [self.cli] + args
         try:
             r = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=timeout,
+                timeout=timeout,          # None = no timeout
                 encoding="utf-8",
                 errors="replace",
             )
@@ -163,17 +168,18 @@ class VPNManager:
         self,
         location: str,
         protocol: Optional[str] = None,
-        timeout : int = CONNECT_TIMEOUT,
+        timeout : Optional[int] = CONNECT_TIMEOUT,
     ) -> Tuple[bool, float, str]:
         """
         Connect to *location*.
+        timeout=None → no timeout (wait forever).
         Returns (success, elapsed_seconds, raw_output).
         """
         args = ["connect", location]
         t0   = time.time()
         out  = self._run(args, timeout=timeout)
         elapsed = round(time.time() - t0, 2)
-        success = "Connected" in out or "متصل" in out  # "متصل"
+        success = "Connected" in out or "متصل" in out
         return success, elapsed, out
 
     def disconnect(self) -> str:
@@ -451,16 +457,25 @@ def load_last_scan() -> List[str]:
 #  MODES
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _resolve_timeout(timeout: int) -> Optional[int]:
+    """Convert timeout value: -1 means no limit (None), otherwise use as-is."""
+    return None if timeout == -1 else timeout
+
+
 def mode_scan(
     vpn       : VPNManager,
     history   : HistoryManager,
     filter_kw : Optional[str] = None,
     timeout   : int           = CONNECT_TIMEOUT,
     protocol  : str           = "Auto",
+    retry     : int           = 0,
 ) -> List[ScanResult]:
     """Fast-scan every location (optionally filtered), history-first."""
 
-    print("📋  Fetching VPN location list …")
+    actual_timeout = _resolve_timeout(timeout)
+    timeout_label  = "no limit" if actual_timeout is None else f"{actual_timeout}s"
+
+    print("📋  Fetching VPN location list ...")
     all_locs = vpn.list_locations()
 
     if filter_kw:
@@ -476,20 +491,32 @@ def mode_scan(
     known   = sum(1 for l in ordered if history.get(l))
 
     print(f"✅  {total} locations to scan  |  {known} have history (tried first)")
-    print(f"⏱   Connect timeout: {timeout}s per location\n")
+    print(f"⏱   Connect timeout: {timeout_label} per location"
+          + (f"  |  retry: {retry}x" if retry > 0 else "") + "\n")
 
     results: List[ScanResult] = []
     t_start = time.time()
 
     for i, loc in enumerate(ordered, 1):
-        s = history.get(loc)
-        badge = f"[{s.success_count}× {s.avg_time:.0f}s]" if s else "[new]"
-        print(f"[{i:>3}/{total}]  {badge:<12}  ⏳ {loc} …", end=" ", flush=True)
+        s     = history.get(loc)
+        badge = f"[{s.success_count}x {s.avg_time:.0f}s]" if s else "[new]"
+        print(f"[{i:>3}/{total}]  {badge:<12}  [{loc}] ...", end=" ", flush=True)
 
-        ok, elapsed, out = vpn.connect(loc, timeout=timeout)
+        ok      = False
+        elapsed = 0.0
+        out     = ""
 
-        if "TIMEOUT" in out:
-            print(f"⏳ timeout ({timeout}s)")
+        for attempt in range(retry + 1):
+            if attempt > 0:
+                vpn.disconnect()
+                print(f"  retry {attempt}/{retry} ...", end=" ", flush=True)
+
+            ok, elapsed, out = vpn.connect(loc, timeout=actual_timeout)
+            if ok:
+                break
+
+        if "TIMEOUT" in out and not ok:
+            print(f"⏳ timeout ({timeout_label})")
         elif ok:
             print(f"✅ {elapsed}s")
             results.append(ScanResult(location=loc, protocol=protocol, elapsed=elapsed))
@@ -501,8 +528,8 @@ def mode_scan(
     total_time = round(time.time() - t_start)
     mins, secs = divmod(total_time, 60)
 
-    print(f"\n{'─'*58}")
-    print(f"🎯  Scan done in {mins}m {secs}s  —  {len(results)}/{total} connected")
+    print(f"\n{'-'*58}")
+    print(f"🎯  Scan done in {mins}m {secs}s  --  {len(results)}/{total} connected")
 
     if results:
         results.sort(key=lambda r: r.elapsed)
@@ -518,21 +545,38 @@ def mode_test(
     tester   : QualityTester,
     history  : HistoryManager,
     locations: List[str],
-    protocol : str = "Auto",
+    protocol : str           = "Auto",
+    timeout  : int           = CONNECT_TIMEOUT,
+    retry    : int           = 0,
 ) -> List[QualityResult]:
     """Deep quality test for a list of locations."""
+    actual_timeout = _resolve_timeout(timeout)
+    timeout_label  = "no limit" if actual_timeout is None else f"{actual_timeout}s"
+
     # Sort by history so best candidates are tested first
     locations = history.sort_locations(locations)
     results: List[QualityResult] = []
     total = len(locations)
 
     for i, loc in enumerate(locations, 1):
-        print(f"\n{'═'*58}")
-        print(f"  [{i}/{total}]  🔷  {loc}")
-        print(f"{'─'*58}")
+        print(f"\n{'='*58}")
+        print(f"  [{i}/{total}]  {loc}")
+        print(f"{'-'*58}")
 
-        print(f"   🔗 Connecting …", end=" ", flush=True)
-        ok, elapsed, out = vpn.connect(loc, timeout=CONNECT_TIMEOUT)
+        ok      = False
+        elapsed = 0.0
+        out     = ""
+
+        for attempt in range(retry + 1):
+            if attempt > 0:
+                vpn.disconnect()
+                print(f"   🔗 Retry {attempt}/{retry} ...", end=" ", flush=True)
+            else:
+                print(f"   🔗 Connecting (timeout: {timeout_label}) ...", end=" ", flush=True)
+
+            ok, elapsed, out = vpn.connect(loc, timeout=actual_timeout)
+            if ok:
+                break
 
         if not ok:
             print(f"⏳ timeout" if "TIMEOUT" in out else "❌ failed")
@@ -591,12 +635,13 @@ def print_quality_table(results: List[QualityResult]) -> None:
 #  MAIN
 # ═════════════════════════════════════════════════════════════════════════════
 
-BANNER = r"""
-  ___                             _____ _           _
- | __|_ ___ __ _ _ ___ ____ __  |  ___(_)_ __   __| | ___ _ __
- | _|\ \ / '_ \ '_/ -_/  _/ _| | |_  | | '_ \ / _` |/ _ \ '__|
- |___/_\_\ .__/_| \___\__\__|   |_|   |_|_| |_|\__,_|\___/_|
-          |_|                          v2.0
+BANNER = """
+  +--------------------------------------------------+
+  |                                                  |
+  |   ExpressFinder  v2.0                            |
+  |   VPN Location Scanner & Quality Tester          |
+  |                                                  |
+  +--------------------------------------------------+
 """
 
 
@@ -613,7 +658,11 @@ def main() -> None:
     parser.add_argument("--filter",  "-f", metavar="KW",
                         help="Filter locations by keyword, e.g. USA, UK, Japan")
     parser.add_argument("--timeout", "-t", type=int, default=CONNECT_TIMEOUT,
-                        help=f"Connect timeout per location in seconds (default {CONNECT_TIMEOUT})")
+                        help=f"Connect timeout per location in seconds. "
+                             f"Use -1 for no timeout (wait forever). Default: {CONNECT_TIMEOUT}")
+    parser.add_argument("--retry", "-r", type=int, default=0, metavar="N",
+                        help="Retry failed connections up to N extra times (default: 0). "
+                             "E.g. --retry 2 means up to 3 total attempts.")
     parser.add_argument("--top",           type=int, default=20,
                         help="Number of locations for 'best' mode (default 20)")
     parser.add_argument("--from-last-scan", action="store_true",
@@ -625,8 +674,13 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    timeout_label = "no limit" if args.timeout == -1 else f"{args.timeout}s"
     print(BANNER)
-    print(f"  Mode : {args.mode}   |   {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    print(f"  Mode    : {args.mode}")
+    print(f"  Timeout : {timeout_label}"
+          + (f"   |   Retry: {args.retry}x" if args.retry > 0 else ""))
+    print(f"  Time    : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print()
 
     vpn     = VPNManager(CLI_PATH)
     history = HistoryManager(Path("."))
@@ -653,7 +707,8 @@ def main() -> None:
             print("❌  No locations to test.")
             return
 
-        qr = mode_test(vpn, tester, history, locs, args.protocol)
+        qr = mode_test(vpn, tester, history, locs, args.protocol,
+                       timeout=args.timeout, retry=args.retry)
         if qr:
             save_quality(qr)
             print_quality_table(qr)
@@ -661,22 +716,25 @@ def main() -> None:
 
     # ── scan ──────────────────────────────────────────────────────────────────
     if args.mode == "scan":
-        sr = mode_scan(vpn, history, args.filter, args.timeout, args.protocol)
+        sr = mode_scan(vpn, history, args.filter, args.timeout, args.protocol,
+                       retry=args.retry)
         if sr:
             save_scan(sr)
         return
 
     # ── auto ──────────────────────────────────────────────────────────────────
     if args.mode == "auto":
-        sr = mode_scan(vpn, history, args.filter, args.timeout, args.protocol)
+        sr = mode_scan(vpn, history, args.filter, args.timeout, args.protocol,
+                       retry=args.retry)
         if sr:
             save_scan(sr)
 
             if not args.no_quality and sr:
-                print(f"\n{'═'*58}")
-                print(f"  🔬  Quality-testing {len(sr)} working location(s) …")
+                print(f"\n{'='*58}")
+                print(f"  Quality-testing {len(sr)} working location(s) ...")
                 locs = [r.location for r in sr]
-                qr   = mode_test(vpn, tester, history, locs, args.protocol)
+                qr   = mode_test(vpn, tester, history, locs, args.protocol,
+                                 timeout=args.timeout, retry=args.retry)
                 if qr:
                     save_quality(qr)
                     print_quality_table(qr)
