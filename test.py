@@ -5,77 +5,99 @@ import sys
 import re
 
 EXPRESSVPN_CLI = r'C:\Program Files (x86)\ExpressVPN\services\ExpressVPN.CLI.exe'
-PROTOCOLS = ["LightwayUdp", "LightwayTcp"]
-OUTPUT_FILE = "successful_connections.txt"
+PROTOCOLS      = ["Auto"]
+OUTPUT_FILE    = "successful_connections.txt"
+CONNECT_TIMEOUT   = 20   # seconds — was None (could hang forever!)
+DISCONNECT_TIMEOUT = 8   # seconds
+LIST_TIMEOUT       = 15  # seconds
 
-def run_command(cmd, timeout=None):
-    """Run a command with optional timeout, return stdout or error."""
+# ──────────────────────────────────────────────
+def run_command(cmd, timeout=10):
+    """Run a CLI command, return combined stdout+stderr."""
     try:
-        result = subprocess.run(
+        r = subprocess.run(
             shlex.split(cmd),
             capture_output=True,
             text=True,
             timeout=timeout
         )
-        return result.stdout.strip()
+        return (r.stdout + r.stderr).strip()
     except subprocess.TimeoutExpired:
-        return f"⏳ Command timed out after {timeout} seconds."
+        return "TIMEOUT"
     except Exception as e:
         return str(e)
 
-# Step 1️⃣: Get locations list
+def is_connected(output: str) -> bool:
+    return "Connected" in output or "متصل" in output
+
+# ── 1. Fetch locations ─────────────────────────
 print("📋 Fetching VPN locations list...")
-list_output = run_command(f'"{EXPRESSVPN_CLI}" list')
+list_output = run_command(f'"{EXPRESSVPN_CLI}" list', timeout=LIST_TIMEOUT)
 
 locations = []
 for line in list_output.splitlines():
     line = line.strip()
     if not line or line.endswith(':'):
-        continue  # Skip empty lines or section titles
+        continue
     match = re.match(r'^(.+?)\s+(\d+)$', line)
     if match:
-        loc_name = match.group(1).strip()
-        if "Israel" in loc_name or "israel" in loc_name: continue
-        locations.append(loc_name)
+        name = match.group(1).strip()
+        if "israel" in name.lower():
+            continue
+        locations.append(name)
 
-if not locations:
-    print("❌ Could not find any VPN locations.")
+# Filter: USA only
+targets = [loc for loc in locations if "USA" in loc]
+
+if not targets:
+    print("❌ No USA VPN locations found.")
     sys.exit(1)
 
-print(f"✅ Found {len(locations)} VPN locations.")
+print(f"✅ Found {len(targets)} USA locations to scan.\n")
 
-# Prepare output file
-with open(OUTPUT_FILE, "w") as f:
-    f.write("Location, Protocol, TimeToConnectSeconds\n")
+# ── 2. Scan ────────────────────────────────────
+results   = []   # (loc, proto, elapsed)
+success   = 0
+failed    = 0
+timed_out = 0
+total     = len(targets)
 
-# Step 2️⃣: Try connecting
-for loc in locations:
+for i, loc in enumerate(targets, 1):
     for proto in PROTOCOLS:
-        print(f"\n🔷 Setting protocol to '{proto}'...")
-        out_protocol = run_command(f'"{EXPRESSVPN_CLI}" protocol {proto}')
-        print(out_protocol)
+        label = f"[{i:>3}/{total}]"
+        print(f"{label} ⏳ {loc} ... ", end="", flush=True)
 
-        print(f"🔷 Connecting to '{loc}' with protocol '{proto}'...")
-        start_time = time.time()
-        out_connect = run_command(f'"{EXPRESSVPN_CLI}" connect "{loc}"', timeout=None)
-        end_time = time.time()
+        start = time.time()
+        out   = run_command(f'"{EXPRESSVPN_CLI}" connect "{loc}"',
+                            timeout=CONNECT_TIMEOUT)
+        elapsed = round(time.time() - start, 2)
 
-        elapsed = round(end_time - start_time, 2)
-        print(out_connect)
-
-        out_status = run_command(f'"{EXPRESSVPN_CLI}" status')
-        print(f"📋 Connection status: {out_status}")
-
-        if "Connected" in out_status or "متصل" in out_status:
-            print(f"✅ Connected to '{loc}' using '{proto}' in {elapsed} seconds.")
-            with open(OUTPUT_FILE, "a") as f:
-                f.write(f"{loc}, {proto}, {elapsed}\n")
+        if "TIMEOUT" in out:
+            print(f"⏳ timed out ({CONNECT_TIMEOUT}s)")
+            timed_out += 1
+        elif is_connected(out):
+            print(f"✅ connected in {elapsed}s")
+            results.append((loc, proto, elapsed))
+            success += 1
         else:
-            print(f"❌ Failed to connect to '{loc}' using '{proto}'.")
+            print(f"❌ failed")
+            failed += 1
 
-        print("🔷 Disconnecting...")
-        out_disconnect = run_command(f'"{EXPRESSVPN_CLI}" disconnect')
-        print(out_disconnect)
+        # Disconnect quickly before next attempt
+        run_command(f'"{EXPRESSVPN_CLI}" disconnect',
+                    timeout=DISCONNECT_TIMEOUT)
 
-print("\n🎯 Script finished. Successful connections (if any) are saved in:")
-print(OUTPUT_FILE)
+# ── 3. Write results ───────────────────────────
+with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    f.write("Location, Protocol, TimeToConnectSeconds\n")
+    for loc, proto, elapsed in results:
+        f.write(f"{loc}, {proto}, {elapsed}\n")
+
+# ── 4. Summary ─────────────────────────────────
+print(f"\n{'─'*50}")
+print(f"🎯 Scan complete!")
+print(f"   ✅ Connected : {success}")
+print(f"   ❌ Failed    : {failed}")
+print(f"   ⏳ Timed out : {timed_out}")
+print(f"   📄 Results   : {OUTPUT_FILE}")
+print(f"{'─'*50}")
