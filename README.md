@@ -56,7 +56,8 @@ Testing each location manually takes **hours**. ExpressFinder automates it:
 
 | Feature | Details |
 |---|---|
-| ⚡ **Fast scanning** | Hard per-location timeout (default 18 s). Previous version used `None` = infinite hang. |
+| ⚡ **Fast scanning** | Configurable per-location timeout (default 18 s). Use `--timeout -1` to wait forever. |
+| 🔁 **Retry on failure** | `--retry N` retries each failed location up to N extra times before moving on. |
 | 🏆 **History-first ordering** | Parses all past `successful_connections_*.txt` files, scores each location, and tries proven winners first. |
 | 📊 **Quality benchmarking** | Ping (avg + jitter), download speed (Mbps), real IP, country, ISP — all through the live tunnel. |
 | 🖥️ **Interactive menu** | `run.bat` gives a numbered menu — no CLI knowledge needed. |
@@ -153,18 +154,27 @@ Tests every location as fast as possible. Locations with a history of success ar
 python expressfinder.py scan
 python expressfinder.py scan --filter USA
 python expressfinder.py scan --filter Japan --timeout 12
+
+# No timeout — wait as long as it takes per location
+python expressfinder.py scan --timeout -1
+
+# Retry each failure up to 2 extra times (3 total attempts)
+python expressfinder.py scan --retry 2
+
+# Combine: no timeout + retry
+python expressfinder.py scan --timeout -1 --retry 3
 ```
 
 **Live output:**
 ```
-[  1/220]  [8× 1.5s]   ⏳ USA - Milwaukee ...         ✅ 1.31s
-[  2/220]  [7× 1.4s]   ⏳ USA - Minneapolis ...        ✅ 1.28s
-[  3/220]  [6× 1.6s]   ⏳ USA - Fargo ...              ❌ failed
-[  4/220]  [new]        ⏳ Australia - Brisbane ...     ⏳ timeout (18s)
+[  1/220]  [8x 1.5s]   [USA - Milwaukee] ...          ✅ 1.31s
+[  2/220]  [7x 1.4s]   [USA - Minneapolis] ...         ✅ 1.28s
+[  3/220]  [6x 1.6s]   [USA - Fargo] ...               ❌ failed
+[  4/220]  [new]        [Australia - Brisbane] ...      ⏳ timeout (18s)
 ...
 
-──────────────────────────────────────────────────────────
-🎯  Scan done in 12m 44s — 9/220 connected
+----------------------------------------------------------
+🎯  Scan done in 12m 44s  --  9/220 connected
 
 🏆  Top 10 fastest:
      1.   1.28s   USA - Minneapolis
@@ -172,7 +182,7 @@ python expressfinder.py scan --filter Japan --timeout 12
      3.   1.43s   USA - Atlanta
 ```
 
-The `[8× 1.5s]` badge means this location has connected successfully 8 times historically with an average of 1.5 s connect time.
+The `[8x 1.5s]` badge means this location has connected successfully 8 times historically with an average of 1.5 s connect time.
 
 ---
 
@@ -195,6 +205,9 @@ python expressfinder.py test --from-last-scan
 
 # Test last scan, USA only
 python expressfinder.py test --from-last-scan --filter USA
+
+# No timeout + retry 2x if connection fails
+python expressfinder.py test --from-last-scan --timeout -1 --retry 2
 ```
 
 **Live output:**
@@ -223,7 +236,8 @@ Runs `scan`, saves working locations, then immediately runs `test` on all of the
 ```powershell
 python expressfinder.py auto
 python expressfinder.py auto --filter USA
-python expressfinder.py auto --no-quality    # scan only, skip quality test
+python expressfinder.py auto --no-quality          # scan only, skip quality test
+python expressfinder.py auto --timeout -1 --retry 2  # most thorough scan
 ```
 
 ---
@@ -254,26 +268,27 @@ python expressfinder.py best --top 30
 
 ## 🖥️ Interactive menu (`run.bat`)
 
-Double-click `run.bat`. It auto-elevates to admin and shows:
+Double-click `run.bat`. It auto-elevates to admin, installs `requests` if missing, and shows:
 
 ```
- ╔══════════════════════════════════════════════╗
- ║          E X P R E S S F I N D E R          ║
- ║              VPN Location Tool               ║
- ╚══════════════════════════════════════════════╝
+ +----------------------------------------------+
+ |          E X P R E S S F I N D E R          |
+ |          VPN Location Scanner v2.0           |
+ +----------------------------------------------+
 
-  [1]  Fast Scan  — ALL locations  (history-sorted)
-  [2]  Fast Scan  — USA only
-  [3]  Fast Scan  — custom filter
-  [4]  Fast Scan  — faster timeout (12s, more misses)
-  ─────────────────────────────────────────────
-  [5]  Quality Test — from last scan results
-  [6]  Quality Test — single location
-  ─────────────────────────────────────────────
-  [7]  Auto mode  — Scan ALL then quality test
-  [8]  Auto mode  — USA scan then quality test
-  ─────────────────────────────────────────────
-  [9]  Show best locations  (from history)
+  [1]  Fast Scan  -- ALL locations  (history-sorted)
+  [2]  Fast Scan  -- USA only
+  [3]  Fast Scan  -- custom filter
+  [4]  Fast Scan  -- faster timeout 12s  (more misses)
+  [5]  Fast Scan  -- NO timeout  (wait forever)
+  -----------------------------------------------
+  [6]  Quality Test -- from last scan results
+  [7]  Quality Test -- single location
+  -----------------------------------------------
+  [8]  Auto mode  -- Scan ALL then quality test
+  [9]  Auto mode  -- USA scan then quality test
+  -----------------------------------------------
+  [B]  Show best locations  (from history)
   [0]  Exit
 ```
 
@@ -295,6 +310,9 @@ Modes:
 Options:
   --filter  / -f  KW    Only include locations containing KW (case-insensitive)
   --timeout / -t  N     Connect timeout in seconds (default: 18)
+                        Use -1 for no timeout (wait forever per location)
+  --retry   / -r  N     Retry failed connections up to N extra times (default: 0)
+                        e.g. --retry 2 means up to 3 total attempts per location
   --top           N     Rows to show in 'best' mode (default: 20)
   --from-last-scan      Load locations from most recent scan file
   --no-quality          Skip quality tests in 'auto' mode
@@ -306,8 +324,12 @@ Options:
 ```powershell
 python expressfinder.py scan --filter "United Kingdom"
 python expressfinder.py scan --filter Canada --timeout 15
+python expressfinder.py scan --timeout -1                    # no timeout at all
+python expressfinder.py scan --retry 2                       # retry failures 2x
+python expressfinder.py scan --timeout -1 --retry 3          # most thorough
 python expressfinder.py test "USA - Atlanta"
 python expressfinder.py test --from-last-scan --filter USA
+python expressfinder.py test "USA - Atlanta" --timeout -1 --retry 2
 python expressfinder.py auto --no-quality
 python expressfinder.py best --top 50
 ```
@@ -442,6 +464,34 @@ python expressfinder.py scan --timeout 12
 ```
 
 Dropping from 18 s to 12 s cuts worst-case time per failed location by 33 %. The trade-off: servers that take 13–17 s to connect will be incorrectly skipped. Use `best` mode to review which locations consistently connect in under 5 s and lower the timeout accordingly.
+
+---
+
+**Q: How do I make scanning more thorough (catch every possible working location)?**
+
+Use `--timeout -1` to remove the timeout entirely, and `--retry` to retry failures:
+
+```powershell
+# Wait as long as needed, retry each failure 2 extra times
+python expressfinder.py scan --timeout -1 --retry 2
+```
+
+This is the slowest but most thorough mode — nothing will be skipped due to timing. Recommended when you have time to spare and want to build a complete picture of what works on your network.
+
+---
+
+**Q: What exactly does `--retry` do?**
+
+When a connection attempt fails (timeout or error), `--retry N` tries that same location up to N additional times before giving up and moving on.
+
+```
+--retry 0   →  1 attempt  (default)
+--retry 1   →  2 attempts
+--retry 2   →  3 attempts
+--retry 3   →  4 attempts
+```
+
+Useful when your network is unstable and connections occasionally fail on the first try but succeed on the second.
 
 ---
 
